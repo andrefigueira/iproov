@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>iProov WebCodecs Technical Evaluation</title>
+    <link rel="stylesheet" href="src/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>iProov WebCodecs Technical Evaluation</h1>
+        <p class="subtitle">Frame Capture, Encoding & Playback System</p>
+      </header>
+
+      <main>
+        <section class="control-section">
+          <button id="start-btn" class="btn-primary">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            Start
+          </button>
+
+          <div class="status-container">
+            <div id="status-text" class="status-text status-ready">
+              Ready to start
+            </div>
+            <div class="progress-container">
+              <div class="progress-bar-bg">
+                <div id="progress-bar" class="progress-bar"></div>
+              </div>
+              <div id="progress-text" class="progress-text">0%</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="output-section">
+          <h2>Camera Preview & Output</h2>
+          <div class="canvas-container">
+            <video id="preview-video" autoplay muted playsinline></video>
+            <canvas id="output-canvas"></canvas>
+            <div class="canvas-overlay">
+              <p>Camera preview will appear here</p>
+            </div>
+          </div>
+
+          <div id="validation-results" class="validation-results" style="display: none;">
+            <h3>Face Detection Results</h3>
+            <div id="validation-summary" class="validation-summary"></div>
+            <div id="validation-details" class="validation-details"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
