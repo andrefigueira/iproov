@@ -1,14 +1,61 @@
 import { IVideoDeviceManager, IVideoDeviceCapability } from '../interfaces/IVideoDevice';
 import { ILogger } from '../interfaces/ILogger';
 
+interface MediaTrackCapabilityRange {
+  min?: number;
+  max?: number;
+}
+
+interface VideoTrackCapabilities {
+  width?: MediaTrackCapabilityRange;
+  height?: MediaTrackCapabilityRange;
+  frameRate?: MediaTrackCapabilityRange;
+  facingMode?: string[];
+}
+
 /**
  * Manages video device enumeration and selection
  * Implements Single Responsibility Principle - only handles device management
+ *
+ * Production-optimized approach:
+ * 1. Request permission once with facingMode constraint
+ * 2. Enumerate devices (labels available after permission)
+ * 3. Select best device based on labels and heuristics
+ * 4. Get final stream with ideal constraints
  */
 export class VideoDeviceManager implements IVideoDeviceManager {
+  private permissionGranted: boolean = false;
+
   constructor(private readonly logger: ILogger) {}
 
+  private async ensurePermission(): Promise<void> {
+    if (this.permissionGranted) {
+      return;
+    }
+
+    this.logger.info('Requesting camera permission...');
+
+    try {
+      // Request permission with user-facing preference
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' },
+      });
+
+      // Stop the stream immediately - we just needed permission
+      stream.getTracks().forEach((track) => track.stop());
+
+      this.permissionGranted = true;
+      this.logger.debug('Camera permission granted');
+    } catch (error) {
+      this.logger.error('Camera permission denied', error as Error);
+      throw new Error('Camera permission denied. Please allow camera access to continue.');
+    }
+  }
+
   async getAvailableDevices(): Promise<IVideoDeviceCapability[]> {
+    // Ensure permission is granted first
+    await this.ensurePermission();
+
     this.logger.info('Enumerating video devices...');
 
     const devices = await navigator.mediaDevices.enumerateDevices();
@@ -16,57 +63,15 @@ export class VideoDeviceManager implements IVideoDeviceManager {
 
     this.logger.debug(`Found ${videoDevices.length} video devices`);
 
-    const capabilities: IVideoDeviceCapability[] = [];
-
-    for (const device of videoDevices) {
-      try {
-        // Request a test stream to get capabilities
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            deviceId: { exact: device.deviceId },
-          },
-        });
-
-        const track = stream.getVideoTracks()[0];
-        const settings = track.getSettings();
-
-        interface MediaTrackCapabilityRange {
-          min?: number;
-          max?: number;
-        }
-
-        interface VideoTrackCapabilities {
-          width?: MediaTrackCapabilityRange;
-          height?: MediaTrackCapabilityRange;
-          frameRate?: MediaTrackCapabilityRange;
-        }
-
-        const trackCapabilities = track.getCapabilities() as VideoTrackCapabilities;
-
-        const width = settings.width || trackCapabilities.width?.max || 1920;
-        const height = settings.height || trackCapabilities.height?.max || 1080;
-        const frameRate = settings.frameRate || trackCapabilities.frameRate?.max || 30;
-
-        // Validate dimensions
-        if (width <= 0 || height <= 0 || frameRate <= 0) {
-          this.logger.warn(`Invalid capabilities for device ${device.deviceId}, skipping`);
-          continue;
-        }
-
-        capabilities.push({
-          deviceId: device.deviceId,
-          label: device.label || `Camera ${capabilities.length + 1}`,
-          width,
-          height,
-          frameRate,
-        });
-
-        // Clean up test stream
-        stream.getTracks().forEach((t) => t.stop());
-      } catch (error) {
-        this.logger.warn(`Failed to get capabilities for device ${device.deviceId}`, error);
-      }
-    }
+    // After permission, device labels are available
+    const capabilities: IVideoDeviceCapability[] = videoDevices.map((device, index) => ({
+      deviceId: device.deviceId,
+      label: device.label || `Camera ${index + 1}`,
+      // Use standard HD defaults - actual resolution will be negotiated by getUserMedia
+      width: 1280,
+      height: 720,
+      frameRate: 30,
+    }));
 
     return capabilities;
   }
@@ -86,15 +91,19 @@ export class VideoDeviceManager implements IVideoDeviceManager {
     });
 
     // Use real cameras if available, otherwise fall back to all devices
-    const camerasToSort = realCameras.length > 0 ? realCameras : devices;
+    const candidateCameras = realCameras.length > 0 ? realCameras : devices;
 
-    // Sort by resolution (width * height) descending
-    camerasToSort.sort((a, b) => b.width * b.height - a.width * a.height);
+    // Prefer front-facing cameras based on label heuristics
+    const frontFacingKeywords = ['front', 'user', 'facetime', 'webcam', 'integrated'];
+    const frontCameras = candidateCameras.filter((device) => {
+      const lowerLabel = device.label.toLowerCase();
+      return frontFacingKeywords.some((keyword) => lowerLabel.includes(keyword));
+    });
 
-    const best = camerasToSort[0];
-    this.logger.info(
-      `Selected best device: ${best.label} (${best.width}x${best.height} @ ${best.frameRate}fps)`
-    );
+    // Use front-facing if found, otherwise use first available
+    const best = frontCameras.length > 0 ? frontCameras[0] : candidateCameras[0];
+
+    this.logger.info(`Selected best device: ${best.label}`);
 
     return best;
   }
@@ -105,15 +114,21 @@ export class VideoDeviceManager implements IVideoDeviceManager {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         deviceId: { exact: capability.deviceId },
-        width: { ideal: capability.width },
-        height: { ideal: capability.height },
-        frameRate: { ideal: capability.frameRate },
-        facingMode: 'user', // Prefer front-facing camera
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 30 },
+        facingMode: 'user',
       },
       audio: false,
     });
 
-    this.logger.debug('Media stream acquired successfully');
+    const track = stream.getVideoTracks()[0];
+    const settings = track.getSettings();
+
+    this.logger.debug(
+      `Media stream acquired: ${settings.width}x${settings.height} @ ${settings.frameRate}fps`
+    );
+
     return stream;
   }
 }

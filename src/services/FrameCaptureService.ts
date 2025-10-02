@@ -40,7 +40,7 @@ export class FrameCaptureService implements IFrameCaptureService {
 
     // Start reading frames continuously
     this.isReading = true;
-    this.readFrames();
+    void this.readFrames();
 
     // Wait for first frame to be available
     await this.waitForFirstFrame();
@@ -105,7 +105,7 @@ export class FrameCaptureService implements IFrameCaptureService {
       const clonedFrame = this.currentFrame.clone();
       this.logger.debug(`Captured frame at timestamp ${clonedFrame.timestamp}`);
 
-      return clonedFrame;
+      return await Promise.resolve(clonedFrame);
     } finally {
       // Release the lock
       releaseLock!();
@@ -118,7 +118,7 @@ export class FrameCaptureService implements IFrameCaptureService {
     this.isReading = false;
 
     if (this.reader) {
-      this.reader.cancel();
+      void this.reader.cancel();
       this.reader = null;
     }
 

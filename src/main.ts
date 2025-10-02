@@ -23,7 +23,7 @@ class Application {
   private statusText: HTMLDivElement | null = null;
   private logger = new ConsoleLogger('Application', LogLevel.DEBUG);
 
-  async initialize(): Promise<void> {
+  initialize(): void {
     this.logger.info('Initializing application...');
 
     // Get UI elements
@@ -68,7 +68,9 @@ class Application {
     }
 
     // Setup event listeners
-    this.startButton.addEventListener('click', () => this.start());
+    this.startButton.addEventListener('click', () => {
+      void this.start();
+    });
 
     this.updateStatus('Ready to start. Click the button to begin.', 'ready');
     this.logger.info('Application initialized successfully');
@@ -94,10 +96,12 @@ class Application {
       this.updateProgress(0);
 
       // Get OpenAI API key from environment or prompt
-      let apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+      const envApiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined;
+      let apiKey = envApiKey;
 
       if (!apiKey) {
-        apiKey = prompt('Enter your OpenAI API key (optional, leave blank to skip face detection):');
+        const userInput = prompt('Enter your OpenAI API key (optional, leave blank to skip face detection):');
+        apiKey = userInput || undefined;
       }
 
       // Create services with dependency injection
@@ -110,7 +114,7 @@ class Application {
 
       // Create face detection service if API key provided
       let faceDetectionService = null;
-      if (apiKey && apiKey.trim()) {
+      if (apiKey && typeof apiKey === 'string' && apiKey.trim()) {
         faceDetectionService = new OpenAIFaceDetectionService(logger);
         faceDetectionService.setApiKey(apiKey.trim());
         this.logger.info('Face detection enabled');
@@ -235,11 +239,11 @@ class Application {
 }
 
 // Initialize application when DOM is ready
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   const logger = new ConsoleLogger('Bootstrap', LogLevel.ERROR);
   const app = new Application();
   try {
-    await app.initialize();
+    app.initialize();
   } catch (error) {
     logger.error('Failed to initialize application', error as Error);
   }

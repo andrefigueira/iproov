@@ -79,13 +79,13 @@ export class WebCodecsOrchestrator {
 
       // Step 6: Cleanup
       onProgress?.(90, 'Cleaning up resources...');
-      await this.cleanup();
+      this.cleanup();
       onProgress?.(100, 'Complete!');
 
       this.logger.info('WebCodecs workflow completed successfully');
     } catch (error) {
       this.logger.error('Workflow failed', error as Error);
-      await this.cleanup();
+      this.cleanup();
       throw error;
     }
   }
@@ -239,7 +239,7 @@ export class WebCodecsOrchestrator {
     this.logger.info('Frames decoded and rendered successfully');
   }
 
-  private async cleanup(): Promise<void> {
+  private cleanup(): void {
     this.logger.info('Cleaning up resources...');
 
     // Dispose services

@@ -8,14 +8,11 @@ import { ILogger } from '../interfaces/ILogger';
 export class VideoEncoderService implements IVideoEncoderService {
   private encoder: VideoEncoder | null = null;
   private encodedChunks: IEncodedChunk[] = [];
-  private config: IVideoEncoderConfig | null = null;
-  private initPromise: Promise<void> | null = null;
 
   constructor(private readonly logger: ILogger) {}
 
   async initialize(config: IVideoEncoderConfig): Promise<void> {
     this.logger.info('Initializing video encoder...', config);
-    this.config = config;
 
     // Check codec support
     const support = await VideoEncoder.isConfigSupported({
@@ -58,7 +55,7 @@ export class VideoEncoderService implements IVideoEncoderService {
     this.logger.debug('Video encoder initialized successfully');
   }
 
-  private handleEncodedChunk(chunk: EncodedVideoChunk, metadata?: EncodedVideoChunkMetadata): void {
+  private handleEncodedChunk(chunk: EncodedVideoChunk, _metadata?: EncodedVideoChunkMetadata): void {
     // Copy chunk data to ArrayBuffer (chunks are not transferable)
     const data = new ArrayBuffer(chunk.byteLength);
     chunk.copyTo(data);
@@ -129,7 +126,6 @@ export class VideoEncoderService implements IVideoEncoderService {
     }
 
     this.encodedChunks = [];
-    this.config = null;
     this.logger.debug('Video encoder disposed');
   }
 }
